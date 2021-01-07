@@ -2,6 +2,7 @@
 This module contains class to define a RPC communications
 """
 import logging
+import rapidjson
 from abc import abstractmethod
 from datetime import date, datetime, timedelta
 from enum import Enum
@@ -665,9 +666,80 @@ class RPC:
         """ Returns the currently active whitelist"""
         res = {'method': self._freqtrade.pairlists.name_list,
                'length': len(self._freqtrade.active_pair_whitelist),
-               'whitelist': self._freqtrade.active_pair_whitelist
+               'whitelist': self._freqtrade.pairlists.whitelist
                }
         return res
+
+    def _rpc_whitelist_add(self, add: List[str] = None) -> Dict:
+            """ Returns the currently active whitelist"""
+            errors = {}
+
+            if add:
+                        stake_currency = self._freqtrade.config.get('stake_currency')
+                        for pair in add:
+                            if self._freqtrade.exchange.get_pair_quote_currency(pair) == stake_currency:
+                                if pair not in self._config['exchange']['pair_whitelist']:
+                                    datafile = '/freqtrade/user_data/'+self._config['name']+'.json'
+                                    with open(datafile, 'r+') as fp:
+                                        conf = rapidjson.load(fp, number_mode=rapidjson.NM_NATIVE)
+                                        conf['exchange']['pair_whitelist'].append(pair)
+                                        fp.seek(0)
+                                        fp.truncate(0)
+                                        rapidjson.dump(conf, fp, indent=4, number_mode=rapidjson.NM_NATIVE)
+
+                                    self._rpc_reload_config()
+
+                                else:
+                                    errors[pair] = {
+                                        'error_msg': f'Pair {pair} already in pairlist.'}
+
+                            else:
+                                errors[pair] = {
+                                    'error_msg': f"Pair {pair} does not match stake currency."
+                                }
+
+            res = {'method': self._freqtrade.pairlists.name_list,
+                   'length': len(self._freqtrade.active_pair_whitelist),
+                   'whitelist': self._freqtrade.active_pair_whitelist,
+                    'errors': errors,
+
+                   }
+            return res
+
+    def _rpc_whitelist_remove(self, remove: List[str] = None) -> Dict:
+                """ Returns the currently active whitelist"""
+                errors = {}
+
+                if remove:
+                            stake_currency = self._freqtrade.config.get('stake_currency')
+                            for pair in remove:
+                                if self._freqtrade.exchange.get_pair_quote_currency(pair) == stake_currency:
+                                    if pair in self._config['exchange']['pair_whitelist']:
+                                       datafile = '/freqtrade/user_data/'+self._config['name']+'.json'
+                                       with open(datafile, 'r+') as fp:
+                                           conf = rapidjson.load(fp, number_mode=rapidjson.NM_NATIVE)
+                                           conf['exchange']['pair_whitelist'].remove(pair)
+                                           fp.seek(0)
+                                           fp.truncate(0)
+                                           rapidjson.dump(conf, fp, indent=4, number_mode=rapidjson.NM_NATIVE)
+
+                                       self._rpc_reload_config()
+                                    else:
+                                        errors[pair] = {
+                                            'error_msg': f'Pair {pair} is not in pairlist.'}
+
+                                else:
+                                    errors[pair] = {
+                                        'error_msg': f"Pair {pair} does not match stake currency."
+                                    }
+
+                res = {'method': self._freqtrade.pairlists.name_list,
+                       'length': len(self._freqtrade.active_pair_whitelist),
+                       'whitelist': self._freqtrade.active_pair_whitelist,
+                        'errors': errors,
+
+                       }
+                return res
 
     def _rpc_blacklist(self, add: List[str] = None) -> Dict:
         """ Returns the currently active blacklist"""

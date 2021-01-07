@@ -86,7 +86,7 @@ class Telegram(RPCHandler):
         """
         self._keyboard: List[List[Union[str, KeyboardButton]]] = [
             ['/daily', '/profit', '/balance'],
-            ['/status', '/status table', '/performance'],
+            ['/status', '/status table', '/performance', '/whitelist'],
             ['/count', '/start', '/stop', '/help']
         ]
         # do not allow commands with mandatory arguments and critical cmds
@@ -99,7 +99,7 @@ class Telegram(RPCHandler):
                                  '/stats', '/count', '/locks', '/balance',
                                  '/stopbuy', '/reload_config', '/show_config',
                                  '/logs', '/whitelist', '/blacklist', '/edge',
-                                 '/help', '/version']
+                                 '/help', '/version', '/add', '/remove']
 
         # custom keyboard specified in config.json
         cust_keyboard = self._config['telegram'].get('keyboard', [])
@@ -146,6 +146,8 @@ class Telegram(RPCHandler):
             CommandHandler(['show_config', 'show_conf'], self._show_config),
             CommandHandler('stopbuy', self._stopbuy),
             CommandHandler('whitelist', self._whitelist),
+            CommandHandler('add', self._whitelist_add),
+            CommandHandler('remove', self._whitelist_remove),
             CommandHandler('blacklist', self._blacklist),
             CommandHandler('logs', self._logs),
             CommandHandler('edge', self._edge),
@@ -724,6 +726,40 @@ class Telegram(RPCHandler):
         """
         try:
             whitelist = self._rpc._rpc_whitelist()
+
+            message = f"Using whitelist `{whitelist['method']}` with {whitelist['length']} pairs\n"
+            message += f"`{', '.join(whitelist['whitelist'])}`"
+
+            logger.debug(message)
+            self._send_msg(message)
+        except RPCException as e:
+            self._send_msg(str(e))
+
+    @authorized_only
+    def _whitelist_add(self, update: Update, context: CallbackContext) -> None:
+        """
+        Handler for /add
+        Shows the currently active whitelist
+        """
+        try:
+            whitelist = self._rpc._rpc_whitelist_add(context.args)
+
+            message = f"Using whitelist `{whitelist['method']}` with {whitelist['length']} pairs\n"
+            message += f"`{', '.join(whitelist['whitelist'])}`"
+
+            logger.debug(message)
+            self._send_msg(message)
+        except RPCException as e:
+            self._send_msg(str(e))
+
+    @authorized_only
+    def _whitelist_remove(self, update: Update, context: CallbackContext) -> None:
+        """
+        Handler for /remove
+        Shows the currently active whitelist
+        """
+        try:
+            whitelist = self._rpc._rpc_whitelist_remove(context.args)
 
             message = f"Using whitelist `{whitelist['method']}` with {whitelist['length']} pairs\n"
             message += f"`{', '.join(whitelist['whitelist'])}`"
